@@ -1,12 +1,10 @@
+// src/controllers/authController.ts
 import { Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
 import { v4 as uuidv4 } from 'uuid';
 import Player from '../models/Player';
+import config from '../config';
 import { logger } from '../utils/logger';
-
-// JWT Secret
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
-const JWT_EXPIRES_IN = '7d';
 
 // Register a new player
 export const register = async (req: Request, res: Response) => {
@@ -19,15 +17,17 @@ export const register = async (req: Request, res: Response) => {
     }
     
     // Check if player with email or wallet already exists
-    const existingPlayer = await Player.findOne({
-      $or: [
-        { email: email },
-        { walletAddress: walletAddress }
-      ]
-    });
-    
-    if (existingPlayer) {
-      return res.status(400).json({ message: 'Player already exists' });
+    if (email || walletAddress) {
+      const existingPlayer = await Player.findOne({
+        $or: [
+          { email: email },
+          { walletAddress: walletAddress }
+        ]
+      });
+      
+      if (existingPlayer) {
+        return res.status(400).json({ message: 'Player already exists' });
+      }
     }
     
     // Create new player
@@ -44,8 +44,8 @@ export const register = async (req: Request, res: Response) => {
     // Generate JWT token
     const token = jwt.sign(
       { id: player.id, name: player.name },
-      JWT_SECRET,
-      { expiresIn: JWT_EXPIRES_IN }
+      config.jwtSecret,
+      { expiresIn: config.jwtExpiresIn }
     );
     
     res.status(201).json({
@@ -61,7 +61,7 @@ export const register = async (req: Request, res: Response) => {
     });
   } catch (error) {
     logger.error('Registration error:', error);
-    res.status(500).json({ message: 'Registration failed' });
+    res.status(500).json({ message: 'Registration failed', error: (error as Error).message });
   }
 };
 
@@ -92,8 +92,8 @@ export const login = async (req: Request, res: Response) => {
     // Generate JWT token
     const token = jwt.sign(
       { id: player.id, name: player.name },
-      JWT_SECRET,
-      { expiresIn: JWT_EXPIRES_IN }
+      config.jwtSecret,
+      { expiresIn: config.jwtExpiresIn }
     );
     
     res.json({
@@ -109,6 +109,30 @@ export const login = async (req: Request, res: Response) => {
     });
   } catch (error) {
     logger.error('Login error:', error);
-    res.status(500).json({ message: 'Login failed' });
+    res.status(500).json({ message: 'Login failed', error: (error as Error).message });
+  }
+};
+
+// Get current player
+export const getCurrentPlayer = async (req: Request, res: Response) => {
+  try {
+    const player = await Player.findOne({ id: req.user.id });
+    
+    if (!player) {
+      return res.status(404).json({ message: 'Player not found' });
+    }
+    
+    res.json({
+      player: {
+        id: player.id,
+        name: player.name,
+        email: player.email,
+        walletAddress: player.walletAddress,
+        stats: player.stats
+      }
+    });
+  } catch (error) {
+    logger.error('Get current player error:', error);
+    res.status(500).json({ message: 'Failed to get player information' });
   }
 };

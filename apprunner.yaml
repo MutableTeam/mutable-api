@@ -8,10 +8,8 @@ build:
       - npm install
     build:
       - echo "Starting build process..."
-      - ls -la
       - npm run build
       - echo "Build completed"
-      - ls -la dist
 run:
   command: npm start
   network:

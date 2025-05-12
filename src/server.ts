@@ -1,50 +1,77 @@
+// src/server.ts
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import mongoose from 'mongoose';
-import dotenv from 'dotenv';
+import config from './config';
 import { logger } from './utils/logger';
-import authRoutes from './routes/authRoutes';
+import routes from './routes';
 
-// Load environment variables
-dotenv.config();
-
-// MongoDB connection string
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/mutable-platform';
+// Create Express app
+const app = express();
+const port = config.port;
 
 // Connect to MongoDB
-mongoose.connect(MONGODB_URI)
+mongoose.connect(config.mongodbUri)
   .then(() => {
-    logger.info('Connected to MongoDB Atlas');
+    logger.info('Connected to MongoDB');
   })
   .catch((error) => {
     logger.error('MongoDB connection error:', error);
-    process.exit(1);
+    // Don't exit in production, just log the error
+    if (config.environment !== 'production') {
+      process.exit(1);
+    }
   });
-
-const app = express();
 
 // Middleware
 app.use(cors());
 app.use(helmet());
 app.use(express.json());
 
-// Routes
-app.use('/api/auth', authRoutes);
+// Log requests in development
+if (config.environment !== 'production') {
+  app.use((req, res, next) => {
+    logger.debug(`${req.method} ${req.url}`);
+    next();
+  });
+}
 
-// Health check endpoint
-app.get('/health', (req, res) => {
-  res.status(200).json({ status: 'ok' });
+// Routes
+app.use('/api', routes);
+
+// Root route
+app.get('/', (req, res) => {
+  res.json({
+    message: 'Mutable API Server',
+    version: '1.0.0',
+    status: 'running'
+  });
 });
 
-// Start the server
-const PORT = process.env.PORT || 8765;
-app.listen(PORT, () => {
-  logger.info(`API server is running on port ${PORT}`);
+// Error handling middleware
+app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  logger.error('Unhandled error:', err);
+  res.status(500).json({
+    message: 'Internal server error',
+    error: config.environment === 'production' ? undefined : err.message
+  });
+});
+
+// Start server
+app.listen(port, () => {
+  logger.info(`Server running on port ${port} in ${config.environment} mode`);
 });
 
 // Handle graceful shutdown
 process.on('SIGTERM', () => {
-  logger.info('SIGTERM received, shutting down...');
+  logger.info('SIGTERM received, shutting down gracefully');
   process.exit(0);
 });
+
+process.on('SIGINT', () => {
+  logger.info('SIGINT received, shutting down gracefully');
+  process.exit(0);
+});
+
+export default app;

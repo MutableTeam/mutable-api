@@ -1,3 +1,4 @@
+// src/models/Player.ts
 import mongoose, { Document, Schema } from 'mongoose';
 import bcrypt from 'bcrypt';
 
@@ -29,21 +30,21 @@ const PlayerSchema = new Schema({
     gamesWon: { type: Number, default: 0 },
     totalWagered: { type: Number, default: 0 },
     totalWon: { type: Number, default: 0 }
-  },
-  createdAt: { type: Date, default: Date.now },
-  updatedAt: { type: Date, default: Date.now }
+  }
 }, {
   timestamps: true
 });
 
 // Hash password before saving
 PlayerSchema.pre('save', async function(next) {
-  const player = this;
+  const player = this as IPlayer;
   if (!player.isModified('password')) return next();
   
   try {
     const salt = await bcrypt.genSalt(10);
-    player.password = await bcrypt.hash(player.password || '', salt);
+    if (player.password) {
+      player.password = await bcrypt.hash(player.password, salt);
+    }
     next();
   } catch (error) {
     next(error as Error);

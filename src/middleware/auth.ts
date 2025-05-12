@@ -1,9 +1,8 @@
+// src/middleware/auth.ts
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
+import config from '../config';
 import { logger } from '../utils/logger';
-
-// JWT Secret
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
 
 // Extend Express Request type to include user
 declare global {
@@ -24,7 +23,7 @@ export const auth = (req: Request, res: Response, next: NextFunction) => {
     }
     
     // Verify token
-    const decoded = jwt.verify(token, JWT_SECRET) as jwt.JwtPayload;
+    const decoded = jwt.verify(token, config.jwtSecret);
     req.user = decoded;
     
     next();
